@@ -3,6 +3,7 @@ import cors from 'cors'
 import helmet from 'helmet'
 import compression from 'compression'
 import rateLimit from 'express-rate-limit'
+import morgan from 'morgan'
 import { createServer } from 'http'
 import { config } from '@/config'
 import { connectDatabase } from '@/config/database'
@@ -16,11 +17,16 @@ const server = createServer(app)
 // Initialize Socket.IO
 const io = initializeSocket(server)
 
+// Logging middleware
+app.use(morgan(config.nodeEnv === 'development' ? 'dev' : 'combined'))
+
 // Security middleware
 app.use(helmet())
 app.use(cors({
   origin: config.cors.origin,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }))
 
 // Rate limiting

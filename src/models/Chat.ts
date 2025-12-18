@@ -1,4 +1,4 @@
-import { Schema, model, Document, Types } from 'mongoose'
+import mongoose, { Schema, model, Document, Types } from 'mongoose'
 
 export interface IMessage {
   _id?: Types.ObjectId
@@ -137,4 +137,5 @@ ChatSchema.methods.markAsRead = function(userId: string) {
   return this.save()
 }
 
-export const Chat = model<IChat>('Chat', ChatSchema)
+export const Chat = mongoose.model<IChat>('Chat', ChatSchema)
+

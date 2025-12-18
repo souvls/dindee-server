@@ -1,0 +1,17 @@
+
+version: '3.8'
+
+services:
+  api:
+    build: .
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    env_file:
+      - .env
+    # Only if you want to connect to local MongoDB from container
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway" 

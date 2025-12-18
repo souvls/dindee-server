@@ -1,9 +1,9 @@
-import { Router } from 'express'
-import { param } from 'express-validator'
-import { 
-  createPost, 
-  getUserPosts, 
-  getApprovedPosts, 
+import { Router } from "express";
+import { param } from "express-validator";
+import {
+  createPost,
+  getUserPosts,
+  getApprovedPosts,
   getPendingPosts,
   approvePost,
   rejectPost,
@@ -18,11 +18,13 @@ import {
   searchPosts,
   getNearbyPosts,
   getPostsByProvince,
-  getSearchStats
-} from '@/controllers/posts'
-import { auth } from '@/middlewares/auth'
+  getSearchStats,
+  getAdminPosts,
+  deletePost,
+} from "@/controllers/posts";
+import { auth } from "@/middlewares/auth";
 
-const router: Router = Router()
+const router: Router = Router();
 
 /**
  * @swagger
@@ -33,9 +35,8 @@ const router: Router = Router()
 
 // Validation rules
 const postIdValidation = [
-  param('id').isMongoId().withMessage('Invalid post ID')
-]
-
+  param("id").isMongoId().withMessage("Invalid post ID"),
+];
 /**
  * @swagger
  * /api/posts/approved:
@@ -81,7 +82,60 @@ const postIdValidation = [
  *                         totalPages:
  *                           type: number
  */
-router.get('/approved', getApprovedPosts)
+router.get("/approved", getApprovedPosts);
+
+/**
+ * @swagger
+ * /api/posts/admin/all:
+ *   get:
+ *     summary: Get all posts (Admin)
+ *     tags: [Posts]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of all posts
+ *       403:
+ *         description: Forbidden
+ */
+router.get("/admin/all", auth, getAdminPosts);
+
+/**
+ * @swagger
+ * /api/posts/{id}:
+ *   delete:
+ *     summary: Delete a post
+ *     tags: [Posts]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Post deleted successfully
+ *       403:
+ *         description: Forbidden
+ */
+router.delete("/:id", auth, postIdValidation, deletePost);
 
 /**
  * @swagger
@@ -111,7 +165,7 @@ router.get('/approved', getApprovedPosts)
  *                       items:
  *                         $ref: '#/components/schemas/Post'
  */
-router.get('/trending', getTrendingPosts)
+router.get("/trending", getTrendingPosts);
 
 /**
  * @swagger
@@ -148,37 +202,7 @@ router.get('/trending', getTrendingPosts)
  *                       items:
  *                         $ref: '#/components/schemas/Post'
  */
-router.get('/most-viewed', getMostViewedPosts)
-
-/**
- * @swagger
- * /api/posts/{id}:
- *   get:
- *     summary: Get single post (automatically tracks view)
- *     tags: [Posts]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Post ID
- *     responses:
- *       200:
- *         description: Post details
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/ApiResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/Post'
- *       404:
- *         description: Post not found
- */
-router.get('/:id', postIdValidation, getPost)
+router.get("/most-viewed", getMostViewedPosts);
 
 /**
  * @swagger
@@ -203,7 +227,7 @@ router.get('/:id', postIdValidation, getPost)
  *       404:
  *         description: Post not found
  */
-router.post('/:id/view', postIdValidation, trackPostView)
+router.post("/:id/view", postIdValidation, trackPostView);
 
 /**
  * @swagger
@@ -246,7 +270,7 @@ router.post('/:id/view', postIdValidation, trackPostView)
  *                               views:
  *                                 type: number
  */
-router.get('/:id/stats', postIdValidation, getPostViewStats)
+router.get("/:id/stats", postIdValidation, getPostViewStats);
 
 /**
  * @swagger
@@ -305,7 +329,7 @@ router.get('/:id/stats', postIdValidation, getPostViewStats)
  *       401:
  *         description: Unauthorized
  */
-router.post('/', auth, postValidation.create, createPost)
+router.post("/", auth, postValidation.create, createPost);
 
 /**
  * @swagger
@@ -343,35 +367,35 @@ router.post('/', auth, postValidation.create, createPost)
  *       401:
  *         description: Unauthorized
  */
-router.get('/my-posts', auth, getUserPosts)
+router.get("/my-posts", auth, getUserPosts);
 
 /**
  * @route GET /api/posts/pending
  * @desc Get pending posts (Admin)
  * @access Private/Admin
  */
-router.get('/pending', getPendingPosts)
+router.get("/pending", getPendingPosts);
 
 /**
  * @route PUT /api/posts/:id/approve
  * @desc Approve post (Admin)
  * @access Private/Admin
  */
-router.put('/:id/approve', postIdValidation, approvePost)
+router.put("/:id/approve", postIdValidation, approvePost);
 
 /**
  * @route PUT /api/posts/:id/reject
  * @desc Reject post (Admin)
  * @access Private/Admin
  */
-router.put('/:id/reject', postIdValidation, rejectPost)
+router.put("/:id/reject", postIdValidation, rejectPost);
 
 /**
  * @route GET /api/posts/user/view-history
  * @desc Get user's view history
  * @access Private
  */
-router.get('/user/view-history', auth, getUserViewHistory)
+router.get("/user/view-history", auth, getUserViewHistory);
 
 /**
  * @swagger
@@ -393,39 +417,64 @@ router.get('/user/view-history', auth, getUserViewHistory)
  *       401:
  *         description: Unauthorized
  */
-router.get('/user/recommended', auth, getRecommendedPosts)
+router.get("/user/recommended", auth, getRecommendedPosts);
 
 /**
  * @swagger
  * /api/posts/search:
  *   get:
- *     summary: Search posts with advanced filters
+ *     summary: Search posts with advanced filters and relevance scoring
+ *     description: |
+ *       Comprehensive search across multiple fields with intelligent relevance ranking.
+ *
+ *       **Text Search (search parameter):**
+ *       - Searches across: title, description, tags, keywords, province, district, street
+ *       - Results ranked by relevance score (most relevant first)
+ *       - Scoring weights: Title (10-15 pts), Tags (8 pts), Keywords (7 pts), Province (6 pts), District (5 pts), Street (4 pts), Description (3 pts)
+ *       - Boosts: Featured (+2 pts), Urgent (+1 pt), Popular posts (up to +3 pts)
+ *
+ *       **Exact Filters:**
+ *       - Use province, district, propertyType for exact field matching
+ *       - Can be combined with text search for precise results
+ *
+ *       **Example Usage:**
+ *       - `?search=ດິນທີ່ສາລະວັນ` - Search all fields, ranked by relevance
+ *       - `?search=ດິນທີ່ສາລະວັນ&province=ສາລະວັນ` - Text search + exact province filter
+ *       - `?province=ວຽງຈັນ&propertyType=land&minPrice=1000000` - Exact filters only
  *     tags: [Posts]
  *     parameters:
  *       - $ref: '#/components/parameters/PageParam'
  *       - $ref: '#/components/parameters/LimitParam'
  *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: |
+ *           Multi-field text search with relevance ranking.
+ *           Searches: title, description, tags, keywords, province, district, street.
+ *           Example: "ດິນທີ່ສາລະວັນ" or "house near market"
+ *       - in: query
  *         name: propertyType
  *         schema:
  *           type: string
  *           enum: [house, land, condo, apartment, villa, townhouse]
- *         description: Filter by property type
+ *         description: Exact match filter for property type
  *       - in: query
  *         name: listingType
  *         schema:
  *           type: string
  *           enum: [sell, rent, lease]
- *         description: Filter by listing type
+ *         description: Exact match filter for listing type
  *       - in: query
  *         name: province
  *         schema:
  *           type: string
- *         description: Filter by province
+ *         description: Exact match filter for province (case-insensitive)
  *       - in: query
  *         name: district
  *         schema:
  *           type: string
- *         description: Filter by district
+ *         description: Exact match filter for district (case-insensitive)
  *       - in: query
  *         name: minPrice
  *         schema:
@@ -476,8 +525,9 @@ router.get('/user/recommended', auth, getRecommendedPosts)
  *         name: sortBy
  *         schema:
  *           type: string
- *           enum: [newest, oldest, price_asc, price_desc, area_asc, area_desc]
- *         description: Sort results
+ *           enum: [newest, oldest, price_asc, price_desc, area_asc, area_desc, distance]
+ *         description: |
+ *           Sort results. When 'search' parameter is provided, results are automatically sorted by relevance unless 'distance' sort is used.
  *       - in: query
  *         name: latitude
  *         schema:
@@ -496,7 +546,7 @@ router.get('/user/recommended', auth, getRecommendedPosts)
  *         description: Search radius in meters (only with lat/lng)
  *     responses:
  *       200:
- *         description: Search results with optional distance data
+ *         description: Search results with optional distance and relevance data
  *         content:
  *           application/json:
  *             schema:
@@ -514,8 +564,11 @@ router.get('/user/recommended', auth, getRecommendedPosts)
  *                               distance:
  *                                 type: number
  *                                 description: Distance in meters (only for geospatial search)
+ *                               relevanceScore:
+ *                                 type: number
+ *                                 description: Relevance score (only when search text is provided)
  */
-router.get('/search', searchPosts)
+router.get("/search", searchPosts);
 
 /**
  * @swagger
@@ -585,7 +638,7 @@ router.get('/search', searchPosts)
  *       400:
  *         description: Invalid coordinates
  */
-router.get('/nearby', getNearbyPosts)
+router.get("/nearby", getNearbyPosts);
 
 /**
  * @swagger
@@ -621,7 +674,7 @@ router.get('/nearby', getNearbyPosts)
  *       200:
  *         description: Posts in the specified province
  */
-router.get('/province/:province', getPostsByProvince)
+router.get("/province/:province", getPostsByProvince);
 
 /**
  * @swagger
@@ -667,6 +720,36 @@ router.get('/province/:province', getPostsByProvince)
  *                               count:
  *                                 type: number
  */
-router.get('/stats/search', getSearchStats)
+router.get("/stats/search", getSearchStats);
 
-export default router
+/**
+ * @swagger
+ * /api/posts/{id}:
+ *   get:
+ *     summary: Get single post (automatically tracks view)
+ *     tags: [Posts]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Post ID
+ *     responses:
+ *       200:
+ *         description: Post details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/Post'
+ *       404:
+ *         description: Post not found
+ */
+router.get("/:id", postIdValidation, getPost);
+
+export default router;

@@ -104,7 +104,7 @@ export class AuthService {
       );
 
       // เก็บ refresh token ใน Redis
-      await redis.set(`refresh_token:${(user as any)._id}`, refreshToken);
+      // await redis.set(`refresh_token:${(user as any)._id}`, refreshToken);
 
       return { user, accessToken, refreshToken };
     } catch (error) {

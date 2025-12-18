@@ -42,11 +42,13 @@ export interface LocationDetails {
     province: string;
     postalCode?: string;
     country?: string;
+
   };
   coordinates: {
     type: 'Point';
-    coordinates: [number, number]; // [longitude, latitude] - GeoJSON format
+    coordinates: [number, number]; // Center point [lng, lat] for geospatial queries
   };
+  boundary?: [number, number][]; // Polygon boundary for land plots [[lng, lat], ...]
   nearbyPlaces?: {
     schools?: string[];
     hospitals?: string[];
@@ -189,6 +191,18 @@ const postSchema = new Schema<IPost>({
           },
           message: 'Coordinates must be an array of [longitude, latitude]'
         }
+      }
+    },
+    boundary: {
+      type: [[Number]],
+      validate: {
+        validator: function(val: number[][]) {
+          if (!val) return true; // Optional field
+          // At least 4 points, each with [lng, lat]
+          return val.length >= 4 &&
+                 val.every((coord: number[]) => coord.length === 2);
+        },
+        message: 'Boundary must be an array of at least 4 coordinate pairs [[lng, lat], ...]'
       }
     },
     nearbyPlaces: {

@@ -1,5 +1,5 @@
-import { Post, IPost } from '@/models/Post'
-import { body } from 'express-validator'
+import { Post, IPost } from "@/models/Post";
+import { body } from "express-validator";
 
 export const postHelper = {
   formatPostResponse: (post: IPost) => {
@@ -32,21 +32,21 @@ export const postHelper = {
       uniqueViewCount: post.uniqueViewCount,
       bookmarkCount: post.bookmarkCount,
       createdAt: post.createdAt,
-      updatedAt: post.updatedAt
-    }
+      updatedAt: post.updatedAt,
+    };
   },
 
   async getPostsByStatus(status: string, page: number = 1, limit: number = 10) {
-    const skip = (page - 1) * limit
-    
+    const skip = (page - 1) * limit;
+
     const [posts, total] = await Promise.all([
       Post.find({ status })
-        .populate('authorId', 'name email avatar')
+        .populate("authorId", "name email avatar")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
-      Post.countDocuments({ status })
-    ])
+      Post.countDocuments({ status }),
+    ]);
 
     return {
       posts,
@@ -54,9 +54,9 @@ export const postHelper = {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
-    }
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   },
 
   async updatePostStatus(id: string, status: string) {
@@ -64,29 +64,45 @@ export const postHelper = {
       id,
       { status },
       { new: true }
-    ).populate('authorId', 'name email avatar')
+    ).populate("authorId", "name email avatar");
 
     if (!post) {
-      throw new Error('Post not found')
+      throw new Error("Post not found");
     }
 
-    return post
-  }
-}
+    return post;
+  },
+};
 
 export const postValidation = {
   create: [
-    body('title').notEmpty().withMessage('Title is required'),
-    body('description').notEmpty().withMessage('Description is required'),
-    body('price').isNumeric().withMessage('Price must be a number'),
-    body('propertyType').isIn(['house', 'land', 'condo', 'apartment', 'villa', 'townhouse']).withMessage('Invalid property type'),
-    body('listingType').isIn(['sell', 'rent', 'lease']).withMessage('Invalid listing type'),
-    body('area').isNumeric().withMessage('Area must be a number'),
-    body('location.address.street').notEmpty().withMessage('Street is required'),
-    body('location.address.district').notEmpty().withMessage('District is required'),
-    body('location.address.province').notEmpty().withMessage('Province is required'),
-    body('location.coordinates.latitude').isFloat({ min: -90, max: 90 }).withMessage('Invalid latitude'),
-    body('location.coordinates.longitude').isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude'),
-    body('media.images').isArray({ min: 1 }).withMessage('At least one image is required'),
-  ]
-}
+    body("title").notEmpty().withMessage("Title is required"),
+    body("description").notEmpty().withMessage("Description is required"),
+    body("price").isNumeric().withMessage("Price must be a number"),
+    body("propertyType")
+      .isIn(["house", "land", "condo", "apartment", "villa", "townhouse"])
+      .withMessage("Invalid property type"),
+    body("listingType")
+      .isIn(["sell", "rent", "lease"])
+      .withMessage("Invalid listing type"),
+    body("area").isNumeric().withMessage("Area must be a number"),
+    // Location validation - support both structures or focus on new one?
+    // Let's validate the new structure primarily
+    body("location.address.street")
+      .optional()
+      .notEmpty()
+      .withMessage("Street is required"),
+    body("location.address.district")
+      .notEmpty()
+      .withMessage("District is required"),
+    body("location.address.province")
+      .notEmpty()
+      .withMessage("Province is required"),
+    // Coordinate validation (optional strictly speaking, but good to have)
+    body("location.coordinates.coordinates").optional().isArray(),
+
+    // Media validation based on new structure
+    // We check either media.images or images (legacy)
+    // body('media.images').optional().isArray({ min: 1 }),
+  ],
+};
