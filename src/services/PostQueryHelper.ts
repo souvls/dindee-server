@@ -26,11 +26,11 @@ export class PostQueryHelper {
       ...filter,
     };
 
-    return await Post.find(query)
+    return (await Post.find(query)
       .skip(skip)
       .limit(limit)
       .populate("authorId", "name email avatar")
-      .lean();
+      .lean()) as unknown as IPost[];
   }
 
   // นับจำนวนโพสต์ในบริเวณใกล้เคียง
@@ -72,7 +72,7 @@ export class PostQueryHelper {
         .skip(skip)
         .limit(limit)
         .populate("authorId", "name email avatar")
-        .lean(),
+        .lean() as unknown as IPost[],
       Post.countDocuments(query),
     ]);
 
