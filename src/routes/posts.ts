@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { param } from "express-validator";
+import multer from "multer";
 import {
   createPost,
   getUserPosts,
@@ -21,10 +22,36 @@ import {
   getSearchStats,
   getAdminPosts,
   deletePost,
+  updatePost,
 } from "@/controllers/posts";
 import { auth } from "@/middlewares/auth";
 
 const router: Router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Middleware to parse JSON fields from FormData
+const parseJsonFields = (req: any, res: any, next: any) => {
+  const jsonFields = [
+    "location",
+    "landDetails",
+    "houseDetails",
+    "condoDetails",
+    "media",
+    "amenities",
+  ];
+
+  jsonFields.forEach((field) => {
+    if (req.body[field] && typeof req.body[field] === "string") {
+      try {
+        req.body[field] = JSON.parse(req.body[field]);
+      } catch (e) {
+        // Keep as string or ignore if invalid JSON
+        console.error(`Failed to parse ${field}:`, e);
+      }
+    }
+  });
+  next();
+};
 
 /**
  * @swagger
@@ -329,7 +356,17 @@ router.get("/:id/stats", postIdValidation, getPostViewStats);
  *       401:
  *         description: Unauthorized
  */
-router.post("/", auth, postValidation.create, createPost);
+router.post(
+  "/",
+  auth,
+  upload.fields([
+    { name: "images", maxCount: 20 },
+    { name: "videos", maxCount: 5 },
+  ]),
+  parseJsonFields,
+  postValidation.create,
+  createPost
+);
 
 /**
  * @swagger
@@ -751,5 +788,92 @@ router.get("/stats/search", getSearchStats);
  *         description: Post not found
  */
 router.get("/:id", postIdValidation, getPost);
+
+/**
+ * @swagger
+ * /api/posts/{id}:
+ *   put:
+ *     summary: Update post
+ *     tags: [Posts]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Post ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *               videos:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *     responses:
+ *       200:
+ *         description: Post updated successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Post not found
+ */
+router.put(
+  "/:id",
+  auth,
+  upload.fields([
+    { name: "images", maxCount: 20 },
+    { name: "videos", maxCount: 5 },
+  ]),
+  parseJsonFields,
+  // validation middleware if needed, e.g. postValidation.update
+  updatePost
+);
+
+/**
+ * @swagger
+ * /api/posts/{id}:
+ *   delete:
+ *     summary: Delete post
+ *     tags: [Posts]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Post ID
+ *     responses:
+ *       200:
+ *         description: Post deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Post not found
+ */
+router.delete("/:id", auth, deletePost);
 
 export default router;

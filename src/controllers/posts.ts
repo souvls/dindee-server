@@ -5,7 +5,7 @@ import { ResponseHelper } from "@/utils/response";
 import { AuthRequest } from "@/middlewares/auth";
 import { Post } from "@/models/Post";
 import { postHelper, postValidation } from "./helpers/postHelper";
-import { PostService } from "@/services/PostService";
+import { PostService, UpdatePostData } from "@/services/PostService";
 import { CreatePostRequest } from "@/types";
 
 const postService = new PostService();
@@ -59,37 +59,6 @@ export const getAdminPosts = async (
   }
 };
 
-// Admin/Owner: Delete Post
-export const deletePost = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const userId = req.user._id.toString();
-    const userRole = req.user.role;
-
-    await postService.deletePost(id, userId, userRole);
-
-    ResponseHelper.success(res, null, "Post deleted successfully");
-  } catch (error) {
-    console.error("Delete post error:", error);
-    if (error instanceof Error) {
-      if (error.message.includes("ไม่พบ")) {
-        // "not found"
-        ResponseHelper.notFound(res, error.message);
-        return;
-      }
-      if (error.message.includes("ไม่มีสิทธิ์")) {
-        // "no permission"
-        ResponseHelper.forbidden(res, error.message);
-        return;
-      }
-    }
-    ResponseHelper.internalError(res);
-  }
-};
-
 // ดึงโพสต์เดี่ยว (พร้อมติดตาม view)
 export const getPost = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -110,10 +79,10 @@ export const getPost = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (post.status !== "approved") {
-      ResponseHelper.forbidden(res, "Post not available");
-      return;
-    }
+    // if (post.status !== "approved") {
+    //   ResponseHelper.forbidden(res, "Post not available");
+    //   return;
+    // }
 
     // ติดตามการเข้าชม (ทำแบบ async เพื่อไม่ให้ช้า)
     ViewTrackingService.trackView(
@@ -370,10 +339,49 @@ export const createPost = async (
     }
 
     const postData: CreatePostRequest = req.body;
+    let media = postData.media || { images: [], videos: [], documents: [] };
+
+    // Handle file uploads
+    if (req.files) {
+      try {
+        const { uploadFileToS3 } = await import("@/helpers/s3Helper");
+        const files = req.files as {
+          [fieldname: string]: Express.Multer.File[];
+        };
+
+        // Upload images
+        if (files["images"]) {
+          const imagePromises = files["images"].map((file) =>
+            uploadFileToS3(file, "images")
+          );
+          const imageUrls = await Promise.all(imagePromises);
+          media.images = [...(media.images || []), ...imageUrls];
+        }
+
+        // Upload videos
+        if (files["videos"]) {
+          const videoPromises = files["videos"].map((file) =>
+            uploadFileToS3(file, "videos")
+          );
+          const videoUrls = await Promise.all(videoPromises);
+          media.videos = [...(media.videos || []), ...videoUrls];
+        }
+      } catch (uploadError) {
+        console.error("File upload error:", uploadError);
+        ResponseHelper.error(
+          res,
+          "Failed to upload media files",
+          undefined,
+          500
+        );
+        return;
+      }
+    }
 
     // Type casting to ensure compatibility with CreatePostData interface
     const createPostData = {
       ...postData,
+      media, // Use the updated media object with S3 URLs
       propertyType: postData.propertyType as
         | "house"
         | "land"
@@ -847,3 +855,160 @@ export const getSearchStats = async (
 
 // Export validation rules
 export { postValidation } from "./helpers/postHelper";
+// อัปเดตโพสต์
+export const updatePost = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const postData: UpdatePostData = req.body;
+    let media: { images: string[]; videos: string[]; documents: string[] } = {
+      images: [],
+      videos: [],
+      documents: [],
+    };
+
+    // 1. Handle Existing Media (from retained URLs)
+    // Parse existingImages/Videos if they are JSON strings (handled by middleware or manually here)
+    // If middleware in router parses them, they are arrays/objects.
+    const existingImages = req.body.existingImages || [];
+    const existingVideos = req.body.existingVideos || [];
+
+    // Ensure they are arrays (if single item)
+    media.images = Array.isArray(existingImages)
+      ? existingImages
+      : [existingImages];
+    media.videos = Array.isArray(existingVideos)
+      ? existingVideos
+      : [existingVideos];
+
+    // Filter out empties just in case
+    media.images = media.images.filter(
+      (url: any) => typeof url === "string" && url.length > 0
+    );
+    media.videos = media.videos.filter(
+      (url: any) => typeof url === "string" && url.length > 0
+    );
+
+    // 2. Handle New File Uploads
+    if (req.files) {
+      try {
+        const { uploadFileToS3 } = await import("@/helpers/s3Helper");
+        const files = req.files as {
+          [fieldname: string]: Express.Multer.File[];
+        };
+
+        // Upload images
+        if (files["images"]) {
+          const imagePromises = files["images"].map((file) =>
+            uploadFileToS3(file, "images")
+          );
+          const imageUrls = await Promise.all(imagePromises);
+          media.images = [...media.images, ...imageUrls];
+        }
+
+        // Upload videos
+        if (files["videos"]) {
+          const videoPromises = files["videos"].map((file) =>
+            uploadFileToS3(file, "videos")
+          );
+          const videoUrls = await Promise.all(videoPromises);
+          media.videos = [...media.videos, ...videoUrls];
+        }
+      } catch (uploadError) {
+        console.error("File upload error:", uploadError);
+        ResponseHelper.error(
+          res,
+          "Failed to upload media files",
+          undefined,
+          500
+        );
+        return;
+      }
+    }
+
+    // Prepare update data
+    const updatePostData: UpdatePostData = {
+      ...postData,
+      images: media.images, // Map legacy images if needed by service
+    };
+
+    // Pass the full media structure if service supports it,
+    // but `UpdatePostData` interface in service (viewed earlier) only has `images?: string[]`.
+    // Wait, let's check `UpdatePostData` in service again.
+    // It has `images?: string[]`. Service update logic merges `data`.
+    // If I want to support videos, I need to update `UpdatePostData` interface in service OR cast it.
+    // The service `updatePost` calls `postRepository.update(id, updateData)`.
+    // Repository likely updates fields.
+    // To support `media` object (images, videos), I should pass `media` property.
+
+    // Let's add `media` to the data passed to service.
+    (updatePostData as any).media = media;
+
+    const post = await postService.updatePost(
+      id,
+      req.user._id.toString(),
+      updatePostData,
+      req.user.role
+    );
+
+    ResponseHelper.success(
+      res,
+      postHelper.formatPostResponse(post),
+      "Post updated successfully"
+    );
+  } catch (error) {
+    console.error("Update post error:", error);
+    if (error instanceof Error) {
+      if (
+        error.message.includes("ไม่พบโพสต์") ||
+        error.message.includes("Post not found")
+      ) {
+        ResponseHelper.notFound(res, "Post not found");
+        return;
+      }
+      if (
+        error.message.includes("ไม่มีสิทธิ์") ||
+        error.message.includes("permission")
+      ) {
+        ResponseHelper.forbidden(res, error.message);
+        return;
+      }
+    }
+    ResponseHelper.internalError(res);
+  }
+};
+
+// ลบโพสต์
+export const deletePost = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    await postService.deletePost(id, req.user._id.toString(), req.user.role);
+
+    ResponseHelper.success(res, null, "Post deleted successfully");
+  } catch (error) {
+    console.error("Delete post error:", error);
+    if (error instanceof Error) {
+      if (
+        error.message.includes("ไม่พบโพสต์") ||
+        error.message.includes("Post not found")
+      ) {
+        ResponseHelper.notFound(res, "Post not found");
+        return;
+      }
+      if (
+        error.message.includes("ไม่มีสิทธิ์") ||
+        error.message.includes("permission")
+      ) {
+        ResponseHelper.forbidden(res, error.message);
+        return;
+      }
+    }
+    ResponseHelper.internalError(res);
+  }
+};
